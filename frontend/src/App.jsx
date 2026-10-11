@@ -295,10 +295,10 @@ function App() {
 
       if (autoEnabled) {
         runAutoTrading();
-      } else {
-        // Keep strategy features fresh when auto is off.
-        analyze();
       }
+
+      // Always keep strategy features fresh.
+      analyze();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -314,16 +314,13 @@ function App() {
 
   const confidence = Math.round(confidenceValue * 100);
 
-  // Try analysis first, then auto-cycle features, then nothing.
+  // Prefer analysis features, fall back to auto-cycle features.
   const features = analysis?.features || autoData?.features || {};
 
   // Live price — prefer ticker, fall back to strategy price.
-  const livePrice =
-    ticker?.last ?? features.price ?? null;
+  const livePrice = ticker?.last ?? features.price ?? null;
 
-  const price = livePrice
-    ? Number(livePrice).toLocaleString()
-    : "--";
+  const price = livePrice ? Number(livePrice).toLocaleString() : "--";
 
   const balance = paper?.balance ?? 0;
   const equity = paper?.equity ?? 0;
@@ -676,7 +673,7 @@ function App() {
 
               <div>
                 <span>SIZE</span>
-                <strong>{position.size}</strong>
+                <strong>{Number(position.size).toFixed(6)}</strong>
               </div>
 
               <div>
@@ -1164,7 +1161,7 @@ function App() {
             {position && (
               <p>
                 <span>[POSITION]</span> {position.side}{" "}
-                {position.size} {position.symbol}
+                {Number(position.size).toFixed(6)} {position.symbol}
               </p>
             )}
 
@@ -1181,11 +1178,13 @@ function App() {
                   confidence
                 </p>
 
-                <p>
-                  <span>[ENGINE]</span>{" "}
-                  {analysis.features.candles_used} candles
-                  analyzed
-                </p>
+                {analysis.features?.candles_used && (
+                  <p>
+                    <span>[ENGINE]</span>{" "}
+                    {analysis.features.candles_used} candles
+                    analyzed
+                  </p>
+                )}
               </>
             )}
           </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./index.css";
 
-const API = "http://127.0.0.1:8000/api";
+const API = "https://weex-ai-trader-production.up.railway.app/api";
 
 function App() {
   const [status, setStatus] = useState("CONNECTING");

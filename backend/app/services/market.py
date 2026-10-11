@@ -13,7 +13,10 @@ class MarketService:
         try:
             ticker = await self.client.get_ticker(symbol)
         except WEEXClientError as error:
-            log.error("ticker failed %s", kv(symbol=symbol, error=str(error)))
+            log.error(
+                "ticker failed %s",
+                kv(symbol=symbol, error=str(error)),
+            )
             raise
 
         log.info(
@@ -51,15 +54,26 @@ class MarketService:
         except WEEXClientError as error:
             log.error(
                 "candles failed %s",
-                kv(symbol=symbol, granularity=granularity, error=str(error)),
+                kv(
+                    symbol=symbol,
+                    granularity=granularity,
+                    error=str(error),
+                ),
             )
             raise
 
         normalized = []
 
         for item in raw_candles:
-            # V3 wraps each candle in a "value" array.
-            candle = item.get("value", [])
+            # V3 candles are returned as arrays, but we handle both
+            # shapes (dicts with a "value" wrapper, or plain arrays)
+            # to be safe.
+            if isinstance(item, dict):
+                candle = item.get("value", [])
+            elif isinstance(item, list):
+                candle = item
+            else:
+                continue
 
             if len(candle) < 8:
                 continue
@@ -76,6 +90,7 @@ class MarketService:
                 }
             )
 
+        # Ensure oldest -> newest, regardless of API response order.
         normalized.sort(key=lambda item: item["timestamp"])
 
         log.info(

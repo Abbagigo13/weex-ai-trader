@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import "./index.css";
 
-const API = "http://127.0.0.1:8000/api";
+const API =
+  import.meta.env.VITE_API_URL ||
+  "https://weex-ai-trader-production.up.railway.app/api";
 
 function App() {
   const [status, setStatus] = useState("CONNECTING");
@@ -10,6 +12,10 @@ function App() {
   const [analysis, setAnalysis] = useState(null);
   const [paper, setPaper] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // AI explanation (Qwen via Alibaba Cloud)
+  const [aiExplain, setAiExplain] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Backtest
   const [backtest, setBacktest] = useState(null);
@@ -159,6 +165,24 @@ function App() {
   }
 
   // ------------------------------------------------------------------
+  // AI explanation
+  // ------------------------------------------------------------------
+  async function loadAiExplanation() {
+    setAiLoading(true);
+    try {
+      const response = await fetch(`${API}/analyze/${symbol}/explain`);
+      if (!response.ok) throw new Error("AI explanation request failed");
+      const data = await response.json();
+      setAiExplain(data.ai ?? null);
+    } catch (error) {
+      console.error(error);
+      setAiExplain(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Backtest
   // ------------------------------------------------------------------
   async function runBacktest() {
@@ -286,6 +310,12 @@ function App() {
     void initialize();
   }, []);
 
+  // Load the AI explanation once, and again when the symbol changes.
+  // (Not part of the 5-second refresh, to keep API usage low.)
+  useEffect(() => {
+    void loadAiExplanation();
+  }, [symbol]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       loadMarket();
@@ -295,10 +325,10 @@ function App() {
 
       if (autoEnabled) {
         runAutoTrading();
-      } else {
-        // Keep strategy features fresh when auto is off.
-        analyze();
       }
+
+      // Always keep strategy features fresh.
+      analyze();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -314,16 +344,13 @@ function App() {
 
   const confidence = Math.round(confidenceValue * 100);
 
-  // Try analysis first, then auto-cycle features, then nothing.
+  // Prefer analysis features, fall back to auto-cycle features.
   const features = analysis?.features || autoData?.features || {};
 
   // Live price — prefer ticker, fall back to strategy price.
-  const livePrice =
-    ticker?.last ?? features.price ?? null;
+  const livePrice = ticker?.last ?? features.price ?? null;
 
-  const price = livePrice
-    ? Number(livePrice).toLocaleString()
-    : "--";
+  const price = livePrice ? Number(livePrice).toLocaleString() : "--";
 
   const balance = paper?.balance ?? 0;
   const equity = paper?.equity ?? 0;
@@ -603,8 +630,61 @@ function App() {
                 "Run analysis to generate a market signal."}
             </p>
 
+            {/* AI EXPLANATION */}
+
+            <div
+              style={{
+                margin: "0.75rem 0",
+                padding: "0.75rem",
+                borderRadius: "8px",
+                border: "1px solid #232733",
+                background: "rgba(255, 255, 255, 0.03)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.7rem",
+                  letterSpacing: "0.08em",
+                  opacity: 0.7,
+                  marginBottom: "0.4rem",
+                }}
+              >
+                <span>AI EXPLANATION</span>
+                <span>
+                  {aiExplain?.source === "qwen"
+                    ? `QWEN · ${aiExplain.model}`
+                    : aiExplain
+                    ? "RULE-BASED FALLBACK"
+                    : ""}
+                </span>
+              </div>
+
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "0.85rem",
+                  lineHeight: 1.5,
+                }}
+              >
+                {aiLoading
+                  ? "Generating explanation..."
+                  : aiExplain?.explanation ||
+                    "AI explanation unavailable."}
+              </p>
+            </div>
+
             <button onClick={analyze} disabled={loading}>
               {loading ? "ANALYZING..." : "RUN AI ANALYSIS"}
+            </button>
+
+            <button
+              onClick={loadAiExplanation}
+              disabled={aiLoading}
+              style={{ marginTop: "0.5rem" }}
+            >
+              {aiLoading ? "EXPLAINING..." : "EXPLAIN WITH AI"}
             </button>
           </div>
 
@@ -676,7 +756,7 @@ function App() {
 
               <div>
                 <span>SIZE</span>
-                <strong>{position.size}</strong>
+                <strong>{Number(position.size).toFixed(6)}</strong>
               </div>
 
               <div>
@@ -1164,7 +1244,7 @@ function App() {
             {position && (
               <p>
                 <span>[POSITION]</span> {position.side}{" "}
-                {position.size} {position.symbol}
+                {Number(position.size).toFixed(6)} {position.symbol}
               </p>
             )}
 
@@ -1181,12 +1261,21 @@ function App() {
                   confidence
                 </p>
 
-                <p>
-                  <span>[ENGINE]</span>{" "}
-                  {analysis.features.candles_used} candles
-                  analyzed
-                </p>
+                {analysis.features?.candles_used && (
+                  <p>
+                    <span>[ENGINE]</span>{" "}
+                    {analysis.features.candles_used} candles
+                    analyzed
+                  </p>
+                )}
               </>
+            )}
+
+            {aiExplain?.source === "qwen" && (
+              <p>
+                <span>[AI]</span> Explanation generated by{" "}
+                {aiExplain.model}
+              </p>
             )}
           </div>
         </section>

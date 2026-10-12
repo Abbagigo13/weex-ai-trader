@@ -1,4 +1,4 @@
-from typing import Optional
+﻿from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -11,6 +11,7 @@ from ..services.auto_trading import AutoPaperTradingService
 from ..services.weex import WEEXClientError
 from ..services.backtest import BacktestEngine
 from ..services.backtest_data import load_csv, generate_synthetic
+from ..services.ai_explainer import AIExplainer
 from ..strategies.engine import StrategyEngine
 from ..strategies.risk import RiskEngine
 from ..services.walk_forward import WalkForwardEngine
@@ -28,6 +29,7 @@ paper_trading = PaperTradingService(
 )
 strategy_engine = StrategyEngine()
 risk_engine = RiskEngine()
+ai_explainer = AIExplainer()
 
 auto_paper_trading = AutoPaperTradingService(
     market_service=market_service,
@@ -78,6 +80,27 @@ async def analyze_market(symbol: str):
             limit=100,
         )
         return strategy_engine.analyze(market_data)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
+
+
+# AI explanation layer (explains the rule engine's decision)
+@router.get("/ai/status")
+async def ai_status():
+    return ai_explainer.status()
+
+
+@router.get("/analyze/{symbol}/explain")
+async def analyze_market_with_ai(symbol: str):
+    try:
+        market_data = await market_service.get_candles(
+            symbol=symbol,
+            granularity="5m",
+            limit=100,
+        )
+        analysis = strategy_engine.analyze(market_data)
+        ai = await ai_explainer.explain(symbol, analysis)
+        return {**analysis, "ai": ai}
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
@@ -296,7 +319,7 @@ async def kill_trigger(reason: str = "MANUAL_EMERGENCY_STOP"):
 async def kill_release():
     return kill_switch.release()
 
-    
+
 @router.post("/backtest/walk-forward")
 async def walk_forward_backtest(
     symbol: str = "cmt_btcusdt",
@@ -335,6 +358,7 @@ async def walk_forward_backtest(
         raise
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
+
 
 @router.get("/rate-limiter/status")
 async def rate_limiter_status():

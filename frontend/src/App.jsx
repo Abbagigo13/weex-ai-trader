@@ -345,11 +345,14 @@ function App() {
   const confidence = Math.round(confidenceValue * 100);
 
   // Prefer analysis features, fall back to auto-cycle features.
+  // Prefer analysis features, fall back to auto-cycle features.
   const features = analysis?.features || autoData?.features || {};
 
   // Live price — prefer ticker, fall back to strategy price.
   const livePrice = ticker?.last ?? features.price ?? null;
+  const livePrice = ticker?.last ?? features.price ?? null;
 
+  const price = livePrice ? Number(livePrice).toLocaleString() : "--";
   const price = livePrice ? Number(livePrice).toLocaleString() : "--";
 
   const balance = paper?.balance ?? 0;
@@ -756,6 +759,7 @@ function App() {
 
               <div>
                 <span>SIZE</span>
+                <strong>{Number(position.size).toFixed(6)}</strong>
                 <strong>{Number(position.size).toFixed(6)}</strong>
               </div>
 
@@ -1245,6 +1249,7 @@ function App() {
               <p>
                 <span>[POSITION]</span> {position.side}{" "}
                 {Number(position.size).toFixed(6)} {position.symbol}
+                {Number(position.size).toFixed(6)} {position.symbol}
               </p>
             )}
 
@@ -1261,6 +1266,13 @@ function App() {
                   confidence
                 </p>
 
+                {analysis.features?.candles_used && (
+                  <p>
+                    <span>[ENGINE]</span>{" "}
+                    {analysis.features.candles_used} candles
+                    analyzed
+                  </p>
+                )}
                 {analysis.features?.candles_used && (
                   <p>
                     <span>[ENGINE]</span>{" "}
